@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+sfml_project_1/Release/
+sfml_project_1/Debug/
+.vs/
+packages/
