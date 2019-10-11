@@ -8,12 +8,13 @@ class Entity
 public:
 	virtual void draw() = 0; //Отрисовка объектов
 	virtual void process() = 0; //Обработка логики объектов
-	virtual void processEvents(sf::Event event) = 0; //Логика обработки событий системы
+	virtual void processEvents() = 0; //Логика обработки событий системы
 };
 
 class Grass : public Entity
 {
 	sf::RenderWindow& window;
+	sf::Event& event;
 	sf::Texture texture;
 	sf::RectangleShape shape;
 	float coefGrassZoom;
@@ -24,7 +25,7 @@ class Grass : public Entity
 
 public:
 
-	Grass(sf::RenderWindow& window) : window(window)
+	Grass(sf::RenderWindow& window, sf::Event& event) : window(window), event(event)
 	{
 		texture.loadFromFile("imgs/grass-1.png");
 		texture.setRepeated(true);
@@ -38,7 +39,7 @@ public:
 		grassWidth = 3227 / coefGrassZoom;
 		сoefGrassWidth = window.getSize().x * 3 / grassWidth;
 		numberGrassInWidth = window.getSize().x / grassWidth;
-		grassSpeed = 2;
+		grassSpeed = 1;
 
 		shape.setTextureRect(sf::IntRect(0, 0, 3227 * сoefGrassWidth, 988));
 	}
@@ -58,7 +59,7 @@ public:
 		shape.move(-grassSpeed, 0);
 	}
 
-	virtual void processEvents(sf::Event event)
+	virtual void processEvents()
 	{
 	}
 };
@@ -102,20 +103,19 @@ public:
 		countFps++;
 	}
 
-	virtual void processEvents(sf::Event event)
+	virtual void processEvents()
 	{
 	}
 };
 
-
-
 class Bird : public Entity
 {
 	sf::RenderWindow& window;
+	sf::Event& event;
 	sf::Texture texture;
 	sf::RectangleShape shape;
-	int birdIndex;
-	int birdSpeed;
+	int index;
+	int speed;
 
 
 	sf::IntRect getTextureRectForBird(int index)
@@ -127,24 +127,30 @@ class Bird : public Entity
 
 	void animation()
 	{
+		shape.setTextureRect(getTextureRectForBird(index / 2));
+		index++;
 
+		if (index > 13 * 2)
+		{
+			index = 0;
+		}
 	}
 
 public:
 
-	Bird(sf::RenderWindow& window)
-		: window(window)
+	Bird(sf::RenderWindow& window, sf::Event& event)
+		: window(window), event(event)
 	{
 		texture.loadFromFile("imgs/sprite-bird-animated.png");
 
 
-		shape.setSize(sf::Vector2f(100, 100));
+		shape.setSize(sf::Vector2f(60, 60));
 		shape.setTexture(&texture);
 
 		shape.setPosition(window.getSize().x / 2 - 75, window.getSize().y / 2 - 75);
 
-		birdIndex = 0;
-		birdSpeed = 30;
+		index = 0;
+		speed = 30;
 	}
 
 
@@ -156,22 +162,16 @@ public:
 
 	virtual void process()
 	{
-		shape.setTextureRect(getTextureRectForBird(birdIndex / 2));
-		birdIndex++;
-
-		if (birdIndex > 13 * 2)
-		{
-			birdIndex = 0;
-		}
+		animation();
 	}
 
-	virtual void processEvents(sf::Event event)
+	virtual void processEvents()
 	{
 		if (event.KeyPressed && (event.key.code == sf::Keyboard::W))
 		{
 			if (shape.getPosition().y > 0)
 			{
-				shape.move(0, -birdSpeed);
+				shape.move(0, -speed);
 			}
 			else
 			{
@@ -182,7 +182,7 @@ public:
 		{
 			if (shape.getPosition().y + shape.getSize().y < window.getSize().y)
 			{
-				shape.move(0, birdSpeed);
+				shape.move(0, speed);
 			}
 			else
 			{
@@ -193,7 +193,7 @@ public:
 		{
 			if (shape.getPosition().x > 0)
 			{
-				shape.move(-birdSpeed, 0);
+				shape.move(-speed, 0);
 			}
 			else
 			{
@@ -204,13 +204,90 @@ public:
 		{
 			if (shape.getPosition().x + shape.getSize().x < window.getSize().x)
 			{
-				shape.move(birdSpeed, 0);
+				shape.move(speed, 0);
 			}
 			else
 			{
 				shape.setPosition(window.getSize().x - shape.getSize().x, shape.getPosition().y);
 			}
 		}
+	}
+};
+
+
+class Column : public Entity
+{
+	sf::RenderWindow& window;
+	sf::Event& event;
+	sf::Texture texture;
+	sf::RectangleShape shapeTop;
+	sf::RectangleShape shapeBottom;
+	int speed;
+	int spaceBetweenShapes;
+	int spaceBetweenColumns;
+	int width;
+
+
+	void animation()
+	{
+		shapeTop.move(-speed, 0);
+		shapeBottom.move(-speed, 0);
+
+		if (shapeTop.getPosition().x + shapeTop.getSize().x < 0) {
+			shapeTop.setPosition(window.getSize().x + spaceBetweenColumns, 0);
+			shapeTop.setSize(sf::Vector2f(width, randomHeight()));
+
+			shapeBottom.setSize(sf::Vector2f(width, window.getSize().y - shapeTop.getSize().y - spaceBetweenShapes));
+			shapeBottom.setPosition(shapeTop.getPosition().x, shapeTop.getSize().y + spaceBetweenShapes);
+		}
+	}
+
+	int randomHeight() {
+		return rand() % (window.getSize().y - 200) + 50;
+	}
+
+
+public:
+
+	Column(sf::RenderWindow& window, sf::Event& event, int startPositionX)
+		: window(window), event(event)
+	{
+		texture.loadFromFile("imgs/column.png");
+		
+		spaceBetweenShapes = 100;
+		width = 100;
+		spaceBetweenColumns = 200;
+
+		shapeTop.setTexture(&texture);
+		shapeTop.setSize(sf::Vector2f(width, randomHeight()));
+		shapeTop.setPosition(startPositionX, 0);
+
+		shapeBottom.setTexture(&texture);
+		shapeBottom.setSize(sf::Vector2f(width, window.getSize().y - shapeTop.getSize().y - spaceBetweenShapes));
+		shapeBottom.setPosition(shapeTop.getPosition().x, shapeTop.getSize().y + spaceBetweenShapes);
+
+
+		speed = 2;
+	}
+
+
+	virtual void draw()
+	{
+		window.draw(shapeTop);
+		window.draw(shapeBottom);
+	}
+
+
+	virtual void process()
+	{
+		animation();
+	}
+
+	virtual void processEvents()
+	{
+
+
+
 	}
 };
 
@@ -243,13 +320,22 @@ int main()
 		std::cout << "Font Regular was downloaded!" << std::endl;
 
 
+
+
+	entities.push_back(new Column(window, event, WIDTH + 300 * 0));
+	entities.push_back(new Column(window, event, WIDTH + 300 * 1));
+	entities.push_back(new Column(window, event, WIDTH + 300 * 2));
+	entities.push_back(new Column(window, event, WIDTH + 300 * 3));
+	entities.push_back(new Column(window, event, WIDTH + 300 * 4));
+
+
 	//Птичка
-	entities.push_back(new Bird(window));
+	entities.push_back(new Bird(window, event));
 
 
 
 	//Травка
-	entities.push_back(new Grass(window));
+	entities.push_back(new Grass(window, event));
 
 
 	//FPS
@@ -273,7 +359,7 @@ int main()
 
 			for (int i = 0; i < entities.size(); i++)
 			{
-				entities[i]->processEvents(event);
+				entities[i]->processEvents();
 			}
 		}
 
