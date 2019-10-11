@@ -1,15 +1,6 @@
 #include <SFML/Graphics.hpp>
-#include <SFML/Audio.hpp>
 #include <iostream>
 
-struct Borders
-{
-	Borders(int _left, int _top, int _right, int _bottom) : left(_left), top(_top), right(_right), bottom(_bottom)
-	{
-	}
-
-	int left, top, right, bottom;
-};
 
 
 class Entity
@@ -17,8 +8,7 @@ class Entity
 public:
 	virtual void draw() = 0; //Отрисовка объектов
 	virtual void process() = 0; //Обработка логики объектов
-	virtual void processEvents() = 0; //Логика обработки событий системы
-	virtual Borders getBorders() = 0; //Функция возвращает границы объекта
+	virtual void processEvents(sf::Event event) = 0; //Логика обработки событий системы
 };
 
 class Grass : public Entity
@@ -53,16 +43,6 @@ public:
 		shape.setTextureRect(sf::IntRect(0, 0, 3227 * сoefGrassWidth, 988));
 	}
 
-	virtual Borders getBorders()
-	{
-		return Borders(
-			shape.getPosition().x,
-			shape.getPosition().y,
-			shape.getPosition().x + shape.getSize().x,
-			shape.getPosition().y + shape.getSize().y
-		);
-	}
-
 	virtual void draw()
 	{
 		window.draw(shape);
@@ -78,7 +58,7 @@ public:
 		shape.move(-grassSpeed, 0);
 	}
 
-	virtual void processEvents()
+	virtual void processEvents(sf::Event event)
 	{
 	}
 };
@@ -103,17 +83,6 @@ public:
 		text.setCharacterSize(size);
 	}
 
-
-	virtual Borders getBorders()
-	{
-		return Borders(
-			text.getPosition().x,
-			text.getPosition().y,
-			text.getPosition().x + text.getLineSpacing(),
-			text.getPosition().y + text.getCharacterSize()
-		);
-	}
-
 	virtual void draw()
 	{
 		window.draw(text);
@@ -133,143 +102,21 @@ public:
 		countFps++;
 	}
 
-	virtual void processEvents()
+	virtual void processEvents(sf::Event event)
 	{
 	}
 };
 
-class Column : public Entity
-{
-	sf::RenderWindow& window;
-	sf::RectangleShape shapeUp;
-	sf::RectangleShape shapeDown;
-	sf::Texture texture;
-
-	int columnWidth;
-	int columnHeightSpace;
-	int speed;
-	int spaceX;
-
-
-public:
-
-	static int columnCountProgress;
-
-	Column(sf::RenderWindow& window, int positionX, int spaceX) : window(window), spaceX(spaceX)
-	{
-		columnWidth = 100;
-		columnHeightSpace = 150;
-		speed = 2;
-
-		texture.loadFromFile("imgs/column.png");
-
-		shapeDown.setPosition(positionX, std::rand() % 400 + 200);
-		shapeDown.setSize(sf::Vector2f(columnWidth, window.getSize().y - shapeDown.getPosition().y));
-		shapeDown.setTexture(&texture);
-
-		shapeUp.setPosition(shapeDown.getPosition().x, 0);
-		shapeUp.setSize(sf::Vector2f(columnWidth, shapeDown.getPosition().y - columnHeightSpace));
-		shapeUp.setTexture(&texture);
-	}
-
-
-	virtual Borders getBorders()
-	{
-		return Borders(
-			shapeUp.getPosition().x,
-			shapeUp.getSize().y,
-			shapeUp.getPosition().x + shapeUp.getSize().x,
-			shapeDown.getPosition().y
-		);
-	}
-
-	virtual void draw()
-	{
-		window.draw(shapeUp);
-		window.draw(shapeDown);
-	}
-
-	virtual void process()
-	{
-		if (shapeDown.getPosition().x + shapeDown.getSize().x > 0)
-		{
-			shapeDown.setPosition(shapeDown.getPosition().x - speed, shapeDown.getPosition().y);
-			shapeUp.setPosition(shapeDown.getPosition().x - speed, shapeUp.getPosition().y);
-		}
-		else
-		{
-			shapeDown.setPosition(window.getSize().x + spaceX, std::rand() % 400 + 200);
-			shapeDown.setSize(sf::Vector2f(columnWidth, window.getSize().y - shapeDown.getPosition().y));
-
-			shapeUp.setPosition(shapeDown.getPosition().x - speed, shapeUp.getPosition().y);
-			shapeUp.setSize(sf::Vector2f(columnWidth, shapeDown.getPosition().y - columnHeightSpace));
-
-			columnCountProgress++;
-		}
-	}
-
-	virtual void processEvents()
-	{
-	}
-};
-
-int Column::columnCountProgress = 0; // Зануляем счетчик пройденных колонн
-
-class Statistic : public Entity
-{
-	sf::RenderWindow& window;
-	sf::Text text;
-	unsigned int size;
-public:
-
-	Statistic(sf::RenderWindow& window, sf::Font& font) : window(window)
-	{
-		size = 20;
-		text.setFont(font);
-		text.setFillColor(sf::Color(255, 166, 0));
-		text.setCharacterSize(size);
-		text.setPosition(0, 50);
-	}
-
-
-	virtual Borders getBorders()
-	{
-		return Borders(
-			text.getPosition().x,
-			text.getPosition().y,
-			text.getPosition().x + text.getLineSpacing(),
-			text.getPosition().y + text.getCharacterSize()
-		);
-	}
-
-	virtual void draw()
-	{
-		window.draw(text);
-	}
-
-	virtual void process()
-	{
-		text.setString("COUNT: " + std::to_string(Column::columnCountProgress));
-	}
-
-	virtual void processEvents()
-	{
-	}
-};
 
 
 class Bird : public Entity
 {
 	sf::RenderWindow& window;
-	std::vector<Entity*>& entities;
-	sf::Event& event;
 	sf::Texture texture;
 	sf::RectangleShape shape;
 	int birdIndex;
 	int birdSpeed;
 
-	sf::Music musicCaput;
-	
 
 	sf::IntRect getTextureRectForBird(int index)
 	{
@@ -280,25 +127,18 @@ class Bird : public Entity
 
 	void animation()
 	{
-		shape.setTextureRect(getTextureRectForBird(birdIndex / 2));
-		birdIndex++;
 
-		if (birdIndex > 13 * 2)
-		{
-			birdIndex = 0;
-		}
 	}
 
 public:
 
-	Bird(sf::RenderWindow& window, sf::Event& event, std::vector<Entity*>& entities)
-		: window(window), event(event), entities(entities)
+	Bird(sf::RenderWindow& window)
+		: window(window)
 	{
 		texture.loadFromFile("imgs/sprite-bird-animated.png");
-		musicCaput.openFromFile("audio/caput.wav");
-	
 
-		shape.setSize(sf::Vector2f(60, 60));
+
+		shape.setSize(sf::Vector2f(100, 100));
 		shape.setTexture(&texture);
 
 		shape.setPosition(window.getSize().x / 2 - 75, window.getSize().y / 2 - 75);
@@ -307,15 +147,6 @@ public:
 		birdSpeed = 30;
 	}
 
-	virtual Borders getBorders()
-	{
-		return Borders(
-			shape.getPosition().x,
-			shape.getPosition().y,
-			shape.getPosition().x + shape.getSize().x,
-			shape.getPosition().y + shape.getSize().y
-		);
-	}
 
 	virtual void draw()
 	{
@@ -325,33 +156,16 @@ public:
 
 	virtual void process()
 	{
-		animation();
-		Borders birdBorders = getBorders();
-		for (int i = 0; i < entities.size(); i++)
-		{
-			if (dynamic_cast<Column*>(entities[i]))
-			{
-				Borders spaceInColumn = entities[i]->getBorders();
+		shape.setTextureRect(getTextureRectForBird(birdIndex / 2));
+		birdIndex++;
 
-				if (
-					(
-						((birdBorders.right >= spaceInColumn.left) && (birdBorders.right <= spaceInColumn.right)) ||
-						((birdBorders.left >= spaceInColumn.left) && (birdBorders.left <= spaceInColumn.right))
-					) && (
-						(birdBorders.top <= spaceInColumn.top) || (birdBorders.bottom >= spaceInColumn.bottom)
-					)
-				)
-				{
-					//std::cout << "BAM" << std::endl;
-					musicCaput.stop();
-					musicCaput.play();
-						
-				}
-			}
+		if (birdIndex > 13 * 2)
+		{
+			birdIndex = 0;
 		}
 	}
 
-	virtual void processEvents()
+	virtual void processEvents(sf::Event event)
 	{
 		if (event.KeyPressed && (event.key.code == sf::Keyboard::W))
 		{
@@ -430,16 +244,8 @@ int main()
 
 
 	//Птичка
-	entities.push_back(new Bird(window, event, entities));
+	entities.push_back(new Bird(window));
 
-
-	//Колонны
-
-	entities.push_back(new Column(window, window.getSize().x + 300 * 0, 200));
-	entities.push_back(new Column(window, window.getSize().x + 300 * 1, 200));
-	entities.push_back(new Column(window, window.getSize().x + 300 * 2, 200));
-	entities.push_back(new Column(window, window.getSize().x + 300 * 3, 200));
-	entities.push_back(new Column(window, window.getSize().x + 300 * 4, 200));
 
 
 	//Травка
@@ -449,15 +255,9 @@ int main()
 	//FPS
 	entities.push_back(new FPS(window, fontRegular));
 
-	//Statistic
-	entities.push_back(new Statistic(window, fontRegular));
 
 
-	sf::Music music;
-	if (!music.openFromFile("audio/1.wav"))
-		return -1; // error
-	music.play();
-	
+
 
 
 	//Основной цикл приложения 
@@ -470,13 +270,15 @@ int main()
 				window.close();
 
 			//Логика обработки событий
+
 			for (int i = 0; i < entities.size(); i++)
 			{
-				entities[i]->processEvents();
+				entities[i]->processEvents(event);
 			}
 		}
 
 		//Начало блока логики программы
+
 		for (int i = 0; i < entities.size(); i++)
 		{
 			entities[i]->process();
