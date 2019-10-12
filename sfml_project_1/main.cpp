@@ -1,6 +1,20 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
 
+template  <class B, typename T>
+bool instanceOf(T imp) {
+	if (dynamic_cast<B*>(imp) != nullptr) {
+		// imp is instance of B
+		return true;
+	}
+	// imp is NOT instance of B
+	return false;
+}
+
+
+sf::IntRect getIntRect(sf::RectangleShape& shape) {
+	return sf::IntRect(shape.getPosition().x, shape.getPosition().y, shape.getSize().x, shape.getSize().y);
+}
 
 
 class Entity
@@ -9,6 +23,7 @@ public:
 	virtual void draw() = 0; //Отрисовка объектов
 	virtual void process() = 0; //Обработка логики объектов
 	virtual void processEvents() = 0; //Логика обработки событий системы
+	virtual bool intersects(sf::IntRect& rect) = 0;
 };
 
 class Grass : public Entity
@@ -62,6 +77,10 @@ public:
 	virtual void processEvents()
 	{
 	}
+
+	virtual bool intersects(sf::IntRect& rect) {
+		return  getIntRect(shape).intersects(rect);
+	};
 };
 
 class FPS : public Entity
@@ -106,12 +125,105 @@ public:
 	virtual void processEvents()
 	{
 	}
+
+	virtual bool intersects(sf::IntRect& rect) {
+		return false;
+	};
 };
+
+
+class Column : public Entity
+{
+	sf::RenderWindow& window;
+	sf::Event& event;
+	sf::Texture texture;
+	sf::RectangleShape shapeTop;
+	sf::RectangleShape shapeBottom;
+	int speed;
+	int spaceBetweenShapes;
+	int spaceBetweenColumns;
+	int width;
+
+
+	void animation()
+	{
+		shapeTop.move(-speed, 0);
+		shapeBottom.move(-speed, 0);
+
+		if (shapeTop.getPosition().x + shapeTop.getSize().x < 0) {
+			shapeTop.setPosition(window.getSize().x + spaceBetweenColumns, 0);
+			shapeTop.setSize(sf::Vector2f(width, randomHeight()));
+
+			shapeBottom.setSize(sf::Vector2f(width, window.getSize().y - shapeTop.getSize().y - spaceBetweenShapes));
+			shapeBottom.setPosition(shapeTop.getPosition().x, shapeTop.getSize().y + spaceBetweenShapes);
+
+			countColumn += 1;
+		}
+
+	}
+
+	int randomHeight() {
+		return rand() % (window.getSize().y - 200) + 50;
+	}
+
+
+public:
+
+	static int countColumn;
+
+	Column(sf::RenderWindow& window, sf::Event& event, int startPositionX)
+		: window(window), event(event)
+	{
+		texture.loadFromFile("imgs/column.png");
+
+		spaceBetweenShapes = 100;
+		width = 100;
+		spaceBetweenColumns = 200;
+		speed = 2;
+
+
+		shapeTop.setTexture(&texture);
+		shapeTop.setSize(sf::Vector2f(width, randomHeight()));
+		shapeTop.setPosition(startPositionX, 0);
+
+		shapeBottom.setTexture(&texture);
+		shapeBottom.setSize(sf::Vector2f(width, window.getSize().y - shapeTop.getSize().y - spaceBetweenShapes));
+		shapeBottom.setPosition(shapeTop.getPosition().x, shapeTop.getSize().y + spaceBetweenShapes);
+
+
+	}
+
+
+	virtual void draw()
+	{
+		window.draw(shapeTop);
+		window.draw(shapeBottom);
+	}
+
+
+	virtual void process()
+	{
+		animation();
+	}
+
+	virtual void processEvents()
+	{
+
+	}
+
+	virtual bool intersects(sf::IntRect& rect) {
+
+		return getIntRect(shapeTop).intersects(rect) || getIntRect(shapeBottom).intersects(rect);
+	};
+
+};
+int Column::countColumn = 0;
 
 class Bird : public Entity
 {
 	sf::RenderWindow& window;
 	sf::Event& event;
+	std::vector<Entity*>& entities;
 	sf::Texture texture;
 	sf::RectangleShape shape;
 	int index;
@@ -138,8 +250,8 @@ class Bird : public Entity
 
 public:
 
-	Bird(sf::RenderWindow& window, sf::Event& event)
-		: window(window), event(event)
+	Bird(sf::RenderWindow& window, sf::Event& event, std::vector<Entity*>& entities)
+		: window(window), event(event), entities(entities)
 	{
 		texture.loadFromFile("imgs/sprite-bird-animated.png");
 
@@ -157,12 +269,25 @@ public:
 	virtual void draw()
 	{
 		window.draw(shape);
+		//shape.getTextureRect().intersects(df)
 	}
 
 
 	virtual void process()
 	{
 		animation();
+
+		for (int i = 0; i < entities.size(); i++) {
+
+			if (!instanceOf<Bird>(entities[i])) {
+				sf::IntRect rect = getIntRect(shape);
+				if (entities[i]->intersects(rect)) {
+					std::cout << " collision" << std::endl;
+
+				}
+			}
+		}
+
 	}
 
 	virtual void processEvents()
@@ -212,83 +337,48 @@ public:
 			}
 		}
 	}
+
+
+	virtual bool intersects(sf::IntRect& rect) {
+		return  getIntRect(shape).intersects(rect);
+	};
 };
 
 
-class Column : public Entity
+class Statistic : public Entity
 {
 	sf::RenderWindow& window;
-	sf::Event& event;
-	sf::Texture texture;
-	sf::RectangleShape shapeTop;
-	sf::RectangleShape shapeBottom;
-	int speed;
-	int spaceBetweenShapes;
-	int spaceBetweenColumns;
-	int width;
-
-
-	void animation()
-	{
-		shapeTop.move(-speed, 0);
-		shapeBottom.move(-speed, 0);
-
-		if (shapeTop.getPosition().x + shapeTop.getSize().x < 0) {
-			shapeTop.setPosition(window.getSize().x + spaceBetweenColumns, 0);
-			shapeTop.setSize(sf::Vector2f(width, randomHeight()));
-
-			shapeBottom.setSize(sf::Vector2f(width, window.getSize().y - shapeTop.getSize().y - spaceBetweenShapes));
-			shapeBottom.setPosition(shapeTop.getPosition().x, shapeTop.getSize().y + spaceBetweenShapes);
-		}
-	}
-
-	int randomHeight() {
-		return rand() % (window.getSize().y - 200) + 50;
-	}
-
-
+	sf::Text text;
+	unsigned int size;
 public:
 
-	Column(sf::RenderWindow& window, sf::Event& event, int startPositionX)
-		: window(window), event(event)
+	Statistic(sf::RenderWindow& window, sf::Font& font) : window(window)
 	{
-		texture.loadFromFile("imgs/column.png");
-		
-		spaceBetweenShapes = 100;
-		width = 100;
-		spaceBetweenColumns = 200;
 
-		shapeTop.setTexture(&texture);
-		shapeTop.setSize(sf::Vector2f(width, randomHeight()));
-		shapeTop.setPosition(startPositionX, 0);
-
-		shapeBottom.setTexture(&texture);
-		shapeBottom.setSize(sf::Vector2f(width, window.getSize().y - shapeTop.getSize().y - spaceBetweenShapes));
-		shapeBottom.setPosition(shapeTop.getPosition().x, shapeTop.getSize().y + spaceBetweenShapes);
-
-
-		speed = 2;
+		size = 20;
+		text.setFont(font);
+		text.setFillColor(sf::Color(255, 166, 0));
+		text.setCharacterSize(size);
+		text.move(0, 20);
 	}
-
 
 	virtual void draw()
 	{
-		window.draw(shapeTop);
-		window.draw(shapeBottom);
+		window.draw(text);
 	}
-
 
 	virtual void process()
 	{
-		animation();
+		text.setString("ACCOUNT: " + std::to_string(Column::countColumn));
 	}
 
 	virtual void processEvents()
 	{
-
-
-
 	}
+
+	virtual bool intersects(sf::IntRect& rect) {
+		return false;
+	};
 };
 
 
@@ -321,7 +411,6 @@ int main()
 
 
 
-
 	entities.push_back(new Column(window, event, WIDTH + 300 * 0));
 	entities.push_back(new Column(window, event, WIDTH + 300 * 1));
 	entities.push_back(new Column(window, event, WIDTH + 300 * 2));
@@ -330,7 +419,7 @@ int main()
 
 
 	//Птичка
-	entities.push_back(new Bird(window, event));
+	entities.push_back(new Bird(window, event, entities));
 
 
 
@@ -342,8 +431,8 @@ int main()
 	entities.push_back(new FPS(window, fontRegular));
 
 
-
-
+	// Статистика
+	entities.push_back(new Statistic(window, fontRegular));
 
 
 	//Основной цикл приложения 
